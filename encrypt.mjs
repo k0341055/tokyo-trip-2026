@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { webcrypto as crypto } from "node:crypto";
 
 const [src, out] = process.argv.slice(2);
-const password = (process.env.TRIP_PASSWORD || readFileSync(".trip-password", "utf8")).trim();
+const password = (process.env.TRIP_PASSWORD || readFileSync(".trip-password", "utf8")).trim().toLowerCase(); // 密碼不分大小寫（輸入頁也會轉小寫）
 if (!password) throw new Error("missing password");
 const saltHex = readFileSync("crypt-salt.txt", "utf8").trim();
 const salt = Uint8Array.from(saltHex.match(/../g), (h) => parseInt(h, 16));
