@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>旅行行程</title>
+<style>
+:root {
+  --bg: #eef0f3; --surface: #ffffff; --ink: #15171c; --muted: #5a606d; --rule: #d9dce2;
+  --accent: #1d4fa0; --err-bg: #fde8e8; --err-ink: #9b1c1c;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0f1115; --surface: #181b21; --ink: #eceef3; --muted: #9da3b0; --rule: #2a2e36;
+          --accent: #5b8be0; --err-bg: #3a1c1c; --err-ink: #ffb4b4; color-scheme: dark; }
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font: 16px/1.6 -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+  display: grid; place-items: center;
+  padding: max(24px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(24px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+}
+form { width: min(380px, 100%); background: var(--surface); border: 1px solid var(--rule); border-radius: 18px; padding: 24px 22px; display: grid; gap: 14px; }
+.bars { display: flex; gap: 3px; }
+.bars i { width: 14px; height: 6px; border-radius: 3px; display: block; }
+h1 { margin: 0; font-size: 24px; font-weight: 900; }
+p { margin: 0; color: var(--muted); font-size: 14px; }
+label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; color: var(--muted); }
+input[type=password], input[type=text] {
+  width: 100%; border: 1.5px solid var(--rule); background: var(--bg); color: var(--ink); border-radius: 12px;
+  padding: 11px 12px; font: inherit; font-size: 17px; letter-spacing: .04em;
+}
+.remember { display: flex; gap: 8px; align-items: center; font-weight: 500; color: var(--ink); font-size: 14px; }
+.remember input { width: 18px; height: 18px; accent-color: var(--accent); }
+button { border: 0; border-radius: 12px; padding: 12px; font: inherit; font-weight: 700; background: var(--ink); color: var(--surface); cursor: pointer; }
+button:disabled { opacity: .6; cursor: default; }
+.err { background: var(--err-bg); color: var(--err-ink); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+</style>
+</head>
+<body>
+<form id="f" autocomplete="off" hidden>
+  <span class="bars" aria-hidden="true"><i style="background:#1d4fa0"></i><i style="background:#2f8f4e"></i><i style="background:#e88a00"></i><i style="background:#a0458f"></i><i style="background:#0a8fbf"></i><i style="background:#c9242f"></i><i style="background:#e0559a"></i><i style="background:#6b5bb5"></i></span>
+  <h1>旅行行程</h1>
+  <p>這是私人頁面，請輸入密碼。</p>
+  <label for="pw">密碼
+    <input id="pw" type="password" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+  </label>
+  <label class="remember"><input id="rm" type="checkbox" checked>記住這支手機，下次不用再輸入</label>
+  <div class="err" id="err" role="alert" hidden>密碼不對，再試一次。</div>
+  <button id="go" type="submit">打開</button>
+</form>
+<noscript><p>這個頁面需要開啟 JavaScript。</p></noscript>
+<script type="application/json" id="payload">__PAYLOAD__</script>
+<script>
+(function () {
+  "use strict";
+  var STORE = "tokyo-trip-2026:key";
+  var P = JSON.parse(document.getElementById("payload").textContent);
+  var subtle = window.crypto && window.crypto.subtle;
+  function b64d(s) { var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function b64e(buf) { var u = new Uint8Array(buf), s = ""; for (var i = 0; i < u.length; i++) s += String.fromCharCode(u[i]); return btoa(s); }
+  function lsGet() { try { return localStorage.getItem(STORE); } catch (e) { return null; } }
+  function lsSet(v) { try { localStorage.setItem(STORE, v); } catch (e) {} }
+  function lsDel() { try { localStorage.removeItem(STORE); } catch (e) {} }
+
+  function decryptRaw(raw) {
+    return subtle.importKey("raw", raw, { name: "AES-GCM" }, false, ["decrypt"]).then(function (k) {
+      return subtle.decrypt({ name: "AES-GCM", iv: b64d(P.iv) }, k, b64d(P.ct));
+    }).then(function (pt) { return new TextDecoder().decode(pt); });
+  }
+  function deriveRaw(pw) {
+    return subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]).then(function (base) {
+      return subtle.deriveKey({ name: "PBKDF2", salt: b64d(P.salt), iterations: P.iter, hash: "SHA-256" },
+        base, { name: "AES-GCM", length: 256 }, true, ["decrypt"]);
+    }).then(function (k) { return subtle.exportKey("raw", k); });
+  }
+  function show(html) {
+    function run() { document.open(); document.write(html); document.close(); }
+    // replacing the document only works once this page has finished loading
+    if (document.readyState === "complete") setTimeout(run, 0);
+    else window.addEventListener("load", function () { setTimeout(run, 0); }, { once: true });
+  }
+
+  var form = document.getElementById("f"), pw = document.getElementById("pw"), go = document.getElementById("go"), err = document.getElementById("err");
+  function askPassword() { form.hidden = false; try { pw.focus(); } catch (e) {} }
+
+  if (!subtle) {
+    form.hidden = false; go.disabled = true;
+    err.textContent = "這個瀏覽器打不開加密頁面，請改用 Safari 或 Chrome。"; err.hidden = false;
+    return;
+  }
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var value = pw.value.trim().toLowerCase();
+    if (!value) return;
+    go.disabled = true; go.textContent = "解鎖中…"; err.hidden = true;
+    var rawKey;
+    deriveRaw(value).then(function (raw) { rawKey = raw; return decryptRaw(raw); }).then(function (html) {
+      if (document.getElementById("rm").checked) lsSet(b64e(rawKey));
+      show(html);
+    }, function () {
+      go.disabled = false; go.textContent = "打開"; err.textContent = "密碼不對，再試一次。"; err.hidden = false;
+      pw.select();
+    });
+  });
+
+  var saved = lsGet();
+  if (saved) {
+    decryptRaw(b64d(saved)).then(show, function () { lsDel(); askPassword(); });
+  } else {
+    askPassword();
+  }
+})();
+</script>
+</body>
+</html>
